@@ -2,15 +2,22 @@
 
 > Robonomics lighthouse airalab.lighthouse.4.robonomics.sid
 
-## Build Setup
+## Project setup
+```
+yarn install
+```
 
-``` bash
-# install dependencies
-npm install
+### Compiles and hot-reloads for development
+```
+yarn run serve
+```
 
-# serve with hot reload at localhost:8080
-npm run dev
+### Compiles and minifies for production
+```
+yarn run build
+```
 
-# build for production with minification
-npm run build
+### Lints and fixes files
+```
+yarn run lint
 ```

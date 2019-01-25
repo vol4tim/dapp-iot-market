@@ -41,13 +41,11 @@ export default {
   },
   methods: {
     onChangeNetwork (data) {
-      console.log(data)
       if (data.check === true) {
         window.location.reload(false)
       }
     },
-    onChangeAccount (data) {
-      console.log(data)
+    onChangeAccount () {
       window.location.reload(false)
     }
   }
@@ -66,7 +64,7 @@ export default {
     background: #f2f2f2;
     color: rgba(0,0,0,.87);
   }
-  .application .theme--light.card, .theme--light .card {
+  .application .theme--light.v-card, .theme--light .v-card {
     border: 1px solid #707070;
     border-radius: 0;
     box-shadow: none;

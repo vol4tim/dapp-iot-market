@@ -27,12 +27,6 @@
               </v-container>
             </v-card-title>
             <v-card-text>
-              <!-- <v-btn
-                color="warning"
-                @click.native="kfc()"
-              >
-                Agent
-              </v-btn> -->
               <demand-form ref="demandForm" />
               <v-container v-if="price.value > 0" grid-list-md>
                 <v-layout row wrap>
@@ -244,29 +238,6 @@ export default {
       })
   },
   methods: {
-    // kfc () {
-    //   web3.eth.getBlock('latest', (e, r) => {
-    //     const offer = {
-    //       objective: 'QmXs2aHHeCrQEKXxgBHf2Ty24aJayQDfv1BP1tFRWyUzeQ',
-    //       token: robonomics.xrt.address,
-    //       cost: 0,
-    //       validator: '0x0000000000000000000000000000000000000000',
-    //       lighthouse: robonomics.lighthouse.address,
-    //       lighthouseFee: 0,
-    //       deadline: r.number + 1000
-    //     }
-    //     let liability
-    //     robonomics.postOffer('QmXs2aHHeCrQEKXxgBHf2Ty24aJayQDfv1BP1tFRWyUzeJ', offer)
-    //       .then((r) => {
-    //         liability = r
-    //         console.log('liability offer', liability.address)
-    //         return robonomics.postResult({ liability: liability.address, success: true, result: 'QmXs2aHHeCrQEKXxgBHf2Ty24aJayQDfv1BP1tFRWyUzeJ' })
-    //       })
-    //       .then(() => {
-    //         console.log('result send msg')
-    //       })
-    //   })
-    // },
     load () {
       this.offers = null
       axios.get(config.OFFERS_API + this.toggle_filter)
@@ -393,7 +364,7 @@ export default {
             .then(() => {
               this.loadingOrder = false
             })
-            .catch((e) => {
+            .catch(() => {
               this.loadingOrder = false
             })
         } else {
@@ -402,7 +373,7 @@ export default {
             .then(() => {
               this.loadingOrder = false
             })
-            .catch((e) => {
+            .catch(() => {
               this.loadingOrder = false
             })
         }
