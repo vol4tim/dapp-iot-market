@@ -12,6 +12,7 @@
   "dependencies": {
     "axios": "^0.18.0",
     "babel-polyfill": "^6.26.0",
+    "lodash": "^4.17.11",
     "robonomics-js": "^0.4.1",
     "rosbag": "^1.1.0",
     "vue": "^2.5.21",

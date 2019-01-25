@@ -18,9 +18,20 @@
       <b>Data: </b>
       <v-progress-linear v-if="liability.resultMessage.length === 0" :indeterminate="true"></v-progress-linear>
       <div v-else>
-        <span v-for="(res, resIndex) in liability.resultMessage" :key="resIndex">
-          {{ res }}<br />
-        </span>
+        <div v-for="(item, i) in liability.resultMessage" :key="i">
+          <div v-if="item.type === 1">
+            <div style="border: 1px solid #cccaca;margin: 10px 0;width: 200px;padding: 10px;text-align:center">
+              <img width="64" height="64" :src="`//openweathermap.org/themes/openweathermap/assets/vendor/owm/img/widgets/${item.json.weather[0].icon}.png`">
+              <v-divider />
+              <div style="padding-top: 15px;"><b>{{ parseInt(item.json.main.temp) - 273 }}<span>°C</span></b></div>
+            </div>
+            <code style="width:100%"><pre>{{ item.str }}</pre></code>
+          </div>
+          <div v-else-if="item.type === 2">
+            <code style="width:100%"><pre>{{ item.str }}</pre></code>
+          </div>
+          <p v-else>{{ item.str }}</p>
+        </div>
       </div>
     </span>
     <span v-if="liability.result == ''">

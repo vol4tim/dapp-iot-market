@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1 class="text-xs-center">Iot market</h1>
+    <h1 class="text-xs-center">Welcome to the First Robonomics IoT market!</h1>
     <v-container v-if="!robonomicsStatus" fluid fill-height class="px-3">
       <v-layout
         justify-center
@@ -20,8 +20,9 @@
             <v-card-title primary-title>
               <v-container grid-list-md>
                 <v-layout row wrap>
-                  <v-flex md12>
-                    <h3 class="headline mb-0 text-xs-center">Lighthouse: <b>{{ lighthouseName }}</b></h3>
+                  <v-flex md12 class="text-xs-center">
+                    <h3 class="headline mb-0 text-xs-center">Digital market channel / Lighthouse:</h3>
+                    <b>{{ lighthouseName }}</b>
                   </v-flex>
                 </v-layout>
               </v-container>
@@ -39,7 +40,8 @@
                   </v-flex>
                 </v-layout>
               </v-container>
-              <div class="text-xs-center">
+
+              <div v-if="isOrder" class="text-xs-center">
                 <v-btn
                   v-if="approveTrade.value < price.value"
                   :loading="loadingApprove"
@@ -52,11 +54,20 @@
                 <v-btn
                   v-if="approveTrade.value >= price.value"
                   :loading="loadingOrder"
-                  :disabled="isOrder === false || loadingOrder || balance.value < price.value"
+                  :disabled="loadingOrder || balance.value < price.value"
                   color="warning"
                   @click.native="order"
                 >
                   Order
+                </v-btn>
+              </div>
+
+              <div v-else class="text-xs-center">
+                <v-btn
+                  disabled
+                  color="warning"
+                >
+                  Please, choose offer bellow
                 </v-btn>
               </div>
             </v-card-text>
@@ -144,6 +155,7 @@ import Promise from 'bluebird'
 import axios from 'axios'
 import _find from 'lodash/find'
 import _filter from 'lodash/filter'
+import _has from 'lodash/has'
 import { Token } from 'robonomics-js'
 import getRobonomics from '../utils/robonomics'
 import { formatDecimals, watchTx } from '../utils/utils'
@@ -318,7 +330,26 @@ export default {
         ipfsCat(result)
           .then((r) => {
             rosBag(new Blob([r]), (bag) => {
-              this.liability.resultMessage.push(bag.message.data)
+              try {
+                const json = JSON.parse(bag.message.data)
+                if (_has(json, 'weather')) {
+                  this.liability.resultMessage.push({
+                    type: 1,
+                    json,
+                    str: JSON.stringify(json, undefined, 2)
+                  })
+                } else {
+                  this.liability.resultMessage.push({
+                    type: 2,
+                    str: JSON.stringify(json, undefined, 2)
+                  })
+                }
+              } catch (e) {
+                this.liability.resultMessage.push({
+                  type: 3,
+                  str: bag.message.data
+                })
+              }
             }, {})
           })
       }
