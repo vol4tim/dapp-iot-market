@@ -1,0 +1,413 @@
+<template>
+  <div>
+    <h1 class="text-xs-center">Iot market</h1>
+    <v-container v-if="!robonomicsStatus" fluid fill-height class="px-3">
+      <v-layout
+        justify-center
+        align-center
+      >
+        <v-flex text-xs-center>
+          <h1>Load robonomics</h1>
+          <v-progress-circular indeterminate color="primary"></v-progress-circular>
+        </v-flex>
+      </v-layout>
+    </v-container>
+
+    <v-container v-if="robonomicsStatus" grid-list-md class="px-3">
+      <v-layout justify-center row wrap>
+        <v-flex sm12 md10 lg6>
+          <v-card>
+            <v-card-title primary-title>
+              <v-container grid-list-md>
+                <v-layout row wrap>
+                  <v-flex md12>
+                    <h3 class="headline mb-0 text-xs-center">Lighthouse: <b>{{ lighthouseName }}</b></h3>
+                  </v-flex>
+                </v-layout>
+              </v-container>
+            </v-card-title>
+            <v-card-text>
+              <!-- <v-btn
+                color="warning"
+                @click.native="kfc()"
+              >
+                Agent
+              </v-btn> -->
+              <demand-form ref="demandForm" />
+              <v-container v-if="price.value > 0" grid-list-md>
+                <v-layout row wrap>
+                  <v-flex md12>
+                    <div>
+                      Cost: {{price.valueStr}} |
+                      Balance: {{balance.valueStr}} |
+                      Approved: {{approveTrade.valueStr}}
+                    </div>
+                  </v-flex>
+                </v-layout>
+              </v-container>
+              <div class="text-xs-center">
+                <v-btn
+                  v-if="approveTrade.value < price.value"
+                  :loading="loadingApprove"
+                  :disabled="loadingApprove || balance.value < price.value"
+                  color="warning"
+                  @click.native="sendApproveTrade"
+                >
+                  Approve
+                </v-btn>
+                <v-btn
+                  v-if="approveTrade.value >= price.value"
+                  :loading="loadingOrder"
+                  :disabled="isOrder === false || loadingOrder || balance.value < price.value"
+                  color="warning"
+                  @click.native="order"
+                >
+                  Order
+                </v-btn>
+              </div>
+            </v-card-text>
+          </v-card>
+
+          <v-card v-if="liability">
+            <v-card-title primary-title>
+              <div>
+                <h3 class="headline mb-0">Received data</h3>
+              </div>
+            </v-card-title>
+            <v-card-text>
+              <Liability :liability="liability" />
+            </v-card-text>
+          </v-card>
+
+          <v-card>
+            <v-card-title primary-title>
+              <v-container grid-list-md>
+                <v-layout row wrap>
+                  <v-flex md12>
+                    <h3 class="headline mb-0 text-xs-center">Offers</h3>
+                  </v-flex>
+                </v-layout>
+              </v-container>
+            </v-card-title>
+            <v-card-text>
+              <v-btn-toggle v-model="toggle_filter" @change="load">
+                <v-btn value="h" flat>
+                  hour
+                </v-btn>
+                <v-btn value="d" flat>
+                  day
+                </v-btn>
+                <v-btn value="m" flat>
+                  month
+                </v-btn>
+              </v-btn-toggle>
+              <v-divider />
+
+              <v-progress-linear v-if="offers === null" :indeterminate="true"></v-progress-linear>
+              <div v-else>
+                <v-list two-line>
+                  <v-data-iterator
+                    :items="offers"
+                    :pagination.sync="pagination"
+                    hide-actions
+                  >
+                    <template
+                      slot="item"
+                      slot-scope="props"
+                    >
+                      <v-list-tile
+                        avatar
+                        @click="setForm(props.item.id)"
+                      >
+                        <v-list-tile-avatar>
+                          <span v-html="icon(props.item.account)"></span>
+                        </v-list-tile-avatar>
+                        <v-list-tile-content>
+                          <v-list-tile-title v-html="props.item.account"></v-list-tile-title>
+                          <v-list-tile-sub-title v-html="props.item.msg.model"></v-list-tile-sub-title>
+                        </v-list-tile-content>
+                      </v-list-tile>
+                      <v-divider />
+                    </template>
+                  </v-data-iterator>
+                </v-list>
+                <v-pagination
+                  v-if="pages > 1"
+                  v-model="pagination.page"
+                  :length="pages"
+                ></v-pagination>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-flex>
+      </v-layout>
+    </v-container>
+  </div>
+</template>
+
+<script>
+import Promise from 'bluebird'
+import axios from 'axios'
+import _find from 'lodash/find'
+import _filter from 'lodash/filter'
+import { Token } from 'robonomics-js'
+import getRobonomics from '../utils/robonomics'
+import { formatDecimals, watchTx } from '../utils/utils'
+import Liability from './Liability'
+import DemandForm from './DemandForm'
+import * as config from '../config'
+import getIpfs, { cat as ipfsCat } from '../utils/ipfs'
+import rosBag from '../utils/rosBag'
+import setSocket from '../utils/socket'
+
+let robonomics
+
+export default {
+  name: 'info',
+  components: {
+    Liability,
+    DemandForm
+  },
+  data () {
+    return {
+      robonomicsStatus: false,
+      token: null,
+      price: {
+        value: 0,
+        valueStr: ''
+      },
+      loadingApprove: false,
+      loadingOrder: false,
+      isOrder: false,
+      balance: {
+        value: 0,
+        valueStr: ''
+      },
+      approveTrade: {
+        value: 0,
+        valueStr: ''
+      },
+      lighthouseName: '',
+      liability: null,
+      offers: [],
+      pagination: {
+        rowsPerPage: 10
+      },
+      toggle_filter: 'h'
+    }
+  },
+  computed: {
+    pages () {
+      if (this.pagination.rowsPerPage == null ||
+        this.pagination.totalItems == null
+      ) return 0
+      return Math.ceil(this.pagination.totalItems / this.pagination.rowsPerPage)
+    }
+  },
+  created () {
+    return getIpfs()
+      .then(() => getRobonomics())
+      .then((r) => {
+        robonomics = r
+        return robonomics.ready()
+      })
+      .then(() => {
+        console.log('xrt', robonomics.xrt.address)
+        console.log('factory', robonomics.factory.address)
+        console.log('lighthouse', robonomics.lighthouse.address)
+        this.lighthouseName = robonomics.lighthouse.name
+        robonomics.getDemand(null, (msg) => {
+          console.log('demand', msg)
+        })
+        robonomics.getResult((msg) => {
+          console.log('result unverified', msg)
+          if (web3.toChecksumAddress(msg.liability) === web3.toChecksumAddress(robonomics.account)) {
+            this.liability = {
+              address: '',
+              resultMessage: []
+            }
+            this.setResult(msg.result, true)
+          } else if (this.liability !== null && msg.liability === this.liability.address) {
+            this.setResult(msg.result, false)
+          }
+        })
+        this.load()
+        setSocket((socket) => {
+          socket.on('add', (offer) => {
+            this.offers.unshift({ msg: JSON.parse(offer.msg), id: offer.id, account: offer.account })
+          })
+          socket.on('remove', (id) => {
+            this.offers = _filter(this.offers, (offer) => { return offer.id !== id })
+          })
+        })
+        this.robonomicsStatus = true
+      })
+  },
+  methods: {
+    // kfc () {
+    //   web3.eth.getBlock('latest', (e, r) => {
+    //     const offer = {
+    //       objective: 'QmXs2aHHeCrQEKXxgBHf2Ty24aJayQDfv1BP1tFRWyUzeQ',
+    //       token: robonomics.xrt.address,
+    //       cost: 0,
+    //       validator: '0x0000000000000000000000000000000000000000',
+    //       lighthouse: robonomics.lighthouse.address,
+    //       lighthouseFee: 0,
+    //       deadline: r.number + 1000
+    //     }
+    //     let liability
+    //     robonomics.postOffer('QmXs2aHHeCrQEKXxgBHf2Ty24aJayQDfv1BP1tFRWyUzeJ', offer)
+    //       .then((r) => {
+    //         liability = r
+    //         console.log('liability offer', liability.address)
+    //         return robonomics.postResult({ liability: liability.address, success: true, result: 'QmXs2aHHeCrQEKXxgBHf2Ty24aJayQDfv1BP1tFRWyUzeJ' })
+    //       })
+    //       .then(() => {
+    //         console.log('result send msg')
+    //       })
+    //   })
+    // },
+    load () {
+      this.offers = null
+      axios.get(config.OFFERS_API + this.toggle_filter)
+        .then((r) => {
+          this.offers = []
+          r.data.result.forEach((offer) => {
+            this.offers.push({ msg: JSON.parse(offer.msg), id: offer.id, account: offer.account })
+          })
+        })
+    },
+    icon (account) {
+      return jdenticon.toSvg(account, 40)
+    },
+    setForm (id) {
+      this.isOrder = false
+      const offer = _find(this.offers, { id })
+      this.$refs.demandForm.model = offer.msg.model
+      this.$refs.demandForm.objective = offer.msg.objective
+      this.$refs.demandForm.token = offer.msg.token
+      this.$refs.demandForm.cost = offer.msg.cost
+      this.$refs.demandForm.deadline = offer.msg.deadline
+
+      this.price.value = Number(offer.msg.cost)
+      if (this.price.value > 0) {
+        this.token = new Token(robonomics.web3, offer.msg.token)
+        Promise.join(
+          this.token.call('decimals'),
+          this.token.call('symbol'),
+          (decimals, symbol) => {
+            this.token.decimals = decimals
+            this.token.symbol = symbol
+
+            this.price.valueStr = `${formatDecimals(this.price.value, this.token.decimals)} ${this.token.symbol}`
+            return this.fetchBalance()
+          })
+          .then(() => {
+            this.isOrder = true
+          })
+      } else {
+        this.isOrder = true
+      }
+    },
+    fetchBalance () {
+      return this.token.call('balanceOf', [robonomics.account])
+        .then((balanceOf) => {
+          this.balance.value = balanceOf
+          this.balance.valueStr = `${formatDecimals(balanceOf, this.token.decimals)} ${this.token.symbol}`
+          if (balanceOf > 0) {
+            return this.token.call('allowance', [robonomics.account, robonomics.factory.address])
+          }
+          return 0
+        })
+        .then((allowance) => {
+          this.approveTrade.value = allowance
+          this.approveTrade.valueStr = `${formatDecimals(allowance, this.token.decimals)} ${this.token.symbol}`
+        })
+    },
+    sendApproveTrade () {
+      this.loadingApprove = true
+      return this.token.send('approve', [robonomics.factory.address, this.price.value * 100], { from: robonomics.account })
+        .then((r) => watchTx(r))
+        .then(() => this.fetchBalance())
+        .then(() => {
+          this.loadingApprove = false
+        })
+        .catch(() => {
+          this.loadingApprove = false
+        })
+    },
+    setResult (result, check = true) {
+      this.liability = {
+        ...this.liability,
+        result,
+        check
+      }
+      if (this.liability.resultMessage.length === 0) {
+        this.liability.resultMessage.push('')
+        ipfsCat(result)
+          .then((r) => {
+            rosBag(new Blob([r]), (bag) => {
+              this.liability.resultMessage.push(bag.message.data)
+            }, {})
+          })
+      }
+    },
+    newLiability (liability) {
+      console.log('liability demand', liability.address)
+      return liability.getInfo()
+        .then((info) => {
+          this.liability = {
+            address: liability.address,
+            worker: liability.worker,
+            ...info,
+            resultMessage: []
+          }
+          liability.watchResult((result) => {
+            console.log('result', result)
+            this.setResult(result, true)
+          })
+          return true
+        })
+        .catch((e) => {
+          console.log(e)
+          setTimeout(() => {
+            this.newLiability(liability)
+          }, 2000)
+        })
+    },
+    order () {
+      if (this.$refs.demandForm.$refs.form.validate()) {
+        this.liability = null
+        this.loadingOrder = true
+        const demand = {
+          objective: this.$refs.demandForm.objective,
+          token: this.$refs.demandForm.token,
+          cost: this.$refs.demandForm.cost,
+          lighthouse: robonomics.lighthouse.address,
+          validator: '0x0000000000000000000000000000000000000000',
+          validatorFee: 0,
+          deadline: this.$refs.demandForm.deadline
+        }
+        if (this.$refs.demandForm.cost === 0) {
+          robonomics.post('demand', this.$refs.demandForm.model, demand)
+            .then(() => {
+              this.loadingOrder = false
+            })
+            .catch((e) => {
+              this.loadingOrder = false
+            })
+        } else {
+          robonomics.postDemand(this.$refs.demandForm.model, demand)
+            .then((liability) => this.newLiability(liability))
+            .then(() => {
+              this.loadingOrder = false
+            })
+            .catch((e) => {
+              this.loadingOrder = false
+            })
+        }
+      }
+    }
+  }
+}
+</script>
