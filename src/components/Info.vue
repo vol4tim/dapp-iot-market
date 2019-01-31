@@ -390,24 +390,14 @@ export default {
           validatorFee: 0,
           deadline: this.$refs.demandForm.deadline
         }
-        if (this.$refs.demandForm.cost === 0) {
-          robonomics.post('demand', this.$refs.demandForm.model, demand)
-            .then(() => {
-              this.loadingOrder = false
-            })
-            .catch(() => {
-              this.loadingOrder = false
-            })
-        } else {
-          robonomics.postDemand(this.$refs.demandForm.model, demand)
-            .then((liability) => this.newLiability(liability))
-            .then(() => {
-              this.loadingOrder = false
-            })
-            .catch(() => {
-              this.loadingOrder = false
-            })
-        }
+        robonomics.postDemand(this.$refs.demandForm.model, demand)
+          .then((liability) => this.newLiability(liability))
+          .then(() => {
+            this.loadingOrder = false
+          })
+          .catch(() => {
+            this.loadingOrder = false
+          })
       }
     }
   }
